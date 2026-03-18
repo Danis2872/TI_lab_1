@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Лабораторная работа №1: Шифры Плейфера и Виженера</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="card">
+    <div class="title">🔐 Лабораторная работа №1</div>
+
+    <div class="method-row">
+        <button class="method-btn active" id="btnPlayfair">Плейфер</button>
+        <button class="method-btn" id="btnVigenere">Виженер</button>
+    </div>
+
+    <div class="input-group">
+        <span class="input-label">📄 Исходный текст</span>
+        <input type="text" class="input-field" id="inputText">
+    </div>
+
+    <!-- Контейнер для ключей (заполняется динамически) -->
+    <div id="keyContainer" class="keys-wrapper"></div>
+
+    <div class="input-group">
+        <span class="input-label">🔒 Шифротекст</span>
+        <input type="text" class="input-field" id="cipherText">
+    </div>
+
+    <div class="action-row">
+        <button class="action-btn" id="encryptBtn">
+            <span>🔒</span> Зашифровать
+        </button>
+        <button class="action-btn" id="decryptBtn">
+            <span>🔓</span> Расшифровать
+        </button>
+        <button class="action-btn clear" id="clearBtn">
+            <span>🧹</span> Очистить
+        </button>
+    </div>
+
+    <div class="file-row">
+        <button class="file-btn" id="openFileBtn">
+            <span>📂</span> Открыть файл
+        </button>
+        <button class="file-btn" id="saveFileBtn">
+            <span>💾</span> Сохранить в файл
+        </button>
+    </div>
+
+    <input type="file" id="fileInput" class="hidden-file-input" accept=".txt,.text,text/plain">
+
+</div>
+
+<script>
+    (function() {
+        const btnPlayfair = document.getElementById('btnPlayfair');
+        const btnVigenere = document.getElementById('btnVigenere');
+        const encryptBtn = document.getElementById('encryptBtn');
+        const decryptBtn = document.getElementById('decryptBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const openFileBtn = document.getElementById('openFileBtn');
+        const saveFileBtn = document.getElementById('saveFileBtn');
+        const fileInput = document.getElementById('fileInput');
+        const keyContainer = document.getElementById('keyContainer');
+
+        const inputText = document.getElementById('inputText');
+        const cipherText = document.getElementById('cipherText');
+
+        let keyInputs = [];
+
+        let lastSuccessfulOperation = null;
+
+        function createLatinOnlyValidator(inputElement) {
+            inputElement.addEventListener('input', function(e) {
+                this.value = this.value.replace(/[^a-ik-zA-IK-Z]/g, '');
+            });
+        }
+
+        function createRussianOnlyValidator(inputElement) {
+            inputElement.addEventListener('input', function(e) {
+                this.value = this.value.replace(/[^а-яА-ЯёЁ]/g, '');
+            });
+        }
+
+        function createPlayfairKeys() {
+            keyContainer.innerHTML = '';
+            const wrapper = document.createElement('div');
+            wrapper.className = 'keys-container';
+
+            for (let i = 1; i <= 4; i++) {
+                const keyItem = document.createElement('div');
+                keyItem.className = 'key-item';
+
+                const label = document.createElement('span');
+                label.className = 'input-label';
+                label.textContent = `🔑 Ключ ${i}`;
+
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.className = 'input-field';
+                input.id = `key${i}`;
+
+                keyItem.appendChild(label);
+                keyItem.appendChild(input);
+                wrapper.appendChild(keyItem);
+            }
+
+            keyContainer.appendChild(wrapper);
+            keyInputs = [
+                document.getElementById('key1'),
+                document.getElementById('key2'),
+                document.getElementById('key3'),
+                document.getElementById('key4')
+            ];
+
+            keyInputs.forEach(input => {
+                if (input) {
+                    createLatinOnlyValidator(input);
+                }
+            });
+        }
+
+        function createVigenereKey() {
+            keyContainer.innerHTML = '';
+            const wrapper = document.createElement('div');
+            wrapper.className = 'single-key';
+
+            const label = document.createElement('span');
+            label.className = 'input-label';
+            label.textContent = '🔑 Ключевое слово';
+
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.className = 'input-field';
+            input.id = 'singleKey';
+
+            wrapper.appendChild(label);
+            wrapper.appendChild(input);
+            keyContainer.appendChild(wrapper);
+
+            keyInputs = [document.getElementById('singleKey')];
+
+            if (keyInputs[0]) {
+                createRussianOnlyValidator(keyInputs[0]);
+            }
+        }
+
+        function setActiveMethod(activeBtn) {
+            [btnPlayfair, btnVigenere].forEach(btn => btn.classList.remove('active'));
+            activeBtn.classList.add('active');
+
+            if (activeBtn === btnPlayfair) {
+                createPlayfairKeys();
+            } else {
+                createVigenereKey();
+            }
+
+            lastSuccessfulOperation = null;
+        }
+
+        function getKeys() {
+            if (!keyInputs.length) return [];
+            return keyInputs.map(input => input ? input.value.trim() : '').filter(value => value !== '');
+        }
+
+        function validatePlayfairKeys(keys) {
+            const latinOnlyRegex = /^[a-zA-Z]+$/;
+            for (let key of keys) {
+                if (!latinOnlyRegex.test(key)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        function validateVigenereKey(key) {
+            const russianOnlyRegex = /^[а-яА-ЯёЁ]+$/;
+            return russianOnlyRegex.test(key);
+        }
+
+        setActiveMethod(btnPlayfair);
+
+        btnPlayfair.addEventListener('click', () => setActiveMethod(btnPlayfair));
+        btnVigenere.addEventListener('click', () => setActiveMethod(btnVigenere));
+
+        clearBtn.addEventListener('click', () => {
+            inputText.value = '';
+            cipherText.value = '';
+            keyInputs.forEach(input => {
+                if (input) input.value = '';
+            });
+            lastSuccessfulOperation = null;
+        });
+
+        encryptBtn.addEventListener('click', () => {
+            const text = inputText.value.trim();
+            const keys = getKeys();
+            const isPlayfair = btnPlayfair.classList.contains('active');
+
+            if (!text) {
+                alert('Пожалуйста, заполните исходный текст.');
+                return;
+            }
+
+            let isValid = false;
+
+            if (isPlayfair) {
+                if (keys.length < 4) {
+                    alert('Пожалуйста, заполните все 4 ключа.');
+                    return;
+                } else if (!validatePlayfairKeys(keys)) {
+                    alert('Ключи должны содержать только латинские буквы (a-z, A-Z).');
+                    return;
+                } else {
+                    isValid = true;
+                }
+            } else {
+                if (keys.length === 0) {
+                    alert('Пожалуйста, заполните ключевое слово.');
+                    return;
+                } else if (!validateVigenereKey(keys[0])) {
+                    alert('Ключевое слово должно содержать только русские буквы (а-я, А-Я, ёЁ).');
+                    return;
+                } else {
+                    isValid = true;
+                }
+            }
+
+            if (isValid) {
+                lastSuccessfulOperation = 'encrypt';
+            }
+        });
+
+        decryptBtn.addEventListener('click', () => {
+            const text = cipherText.value.trim() || inputText.value.trim();
+            const keys = getKeys();
+            const isPlayfair = btnPlayfair.classList.contains('active');
+
+            if (!text) {
+                alert('Пожалуйста, заполните поле с текстом.');
+                return;
+            }
+
+            let isValid = false;
+
+            if (isPlayfair) {
+                if (keys.length < 4) {
+                    alert('Пожалуйста, заполните все 4 ключа.');
+                    return;
+                } else if (!validatePlayfairKeys(keys)) {
+                    alert('Ключи должны содержать только латинские буквы (a-z, A-Z).');
+                    return;
+                } else {
+                    isValid = true;
+                }
+            } else {
+                if (keys.length === 0) {
+                    alert('Пожалуйста, заполните ключевое слово.');
+                    return;
+                } else if (!validateVigenereKey(keys[0])) {
+                    alert('Ключевое слово должно содержать только русские буквы (а-я, А-Я, ёЁ).');
+                    return;
+                } else {
+                    isValid = true;
+                }
+            }
+
+            if (isValid) {
+                lastSuccessfulOperation = 'decrypt';
+            }
+        });
+
+        openFileBtn.addEventListener('click', () => {
+            fileInput.click();
+        });
+
+        fileInput.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+
+            reader.onload = (e) => {
+                inputText.value = e.target.result;
+                fileInput.value = '';
+                lastSuccessfulOperation = null;
+            };
+
+            reader.onerror = () => {
+                alert('Ошибка при чтении файла');
+                fileInput.value = '';
+            };
+
+            reader.readAsText(file, 'UTF-8');
+        });
+
+        saveFileBtn.addEventListener('click', () => {
+            const isPlayfair = btnPlayfair.classList.contains('active');
+            const methodName = isPlayfair ? 'Плейфер' : 'Виженера';
+
+            let content = '';
+            let operationType = '';
+
+            if (lastSuccessfulOperation === 'encrypt') {
+                const cipher = cipherText.value.trim();
+                if (!cipher) {
+                    alert('Нет зашифрованных данных для сохранения');
+                    return;
+                }
+                content = cipher;
+                operationType = 'зашифрованный';
+            } else if (lastSuccessfulOperation === 'decrypt') {
+                const text = inputText.value.trim();
+                if (!text) {
+                    alert('Нет расшифрованных данных для сохранения');
+                    return;
+                }
+                content = text;
+                operationType = 'расшифрованный';
+            } else {
+                alert('Сначала выполните операцию шифрования или расшифровки');
+                return;
+            }
+
+            const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+
+            link.download = `Результат шифрования алгоритмом ${methodName}.txt`;
+            link.href = url;
+            link.click();
+
+            URL.revokeObjectURL(url);
+
+            console.log(`Сохранен ${operationType} текст алгоритмом ${methodName}`);
+        });
+    })();
+</script>
+<script src="index.js"></script>
+</body>
+</html>
